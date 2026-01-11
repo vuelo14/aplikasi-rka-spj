@@ -3,12 +3,23 @@ require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../src/lib/Database.php';
 require_once __DIR__ . '/../src/lib/Auth.php';
 Auth::start();
+// Ambil koneksi untuk mencari list tahun yang tersedia di Database
+$pdo = Database::getConnection();
+$years = $pdo->query("SELECT DISTINCT tahun FROM rka ORDER BY tahun DESC")->fetchAll(PDO::FETCH_COLUMN);
 
+// Jika database kosong, sediakan tahun ini dan tahun depan
+if (empty($years)) {
+  $cur = date('Y');
+  $years = [$cur, $cur + 1];
+}
 $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $email = trim($_POST['email'] ?? '');
   $password = $_POST['password'] ?? '';
-  if (Auth::login($email, $password)) {
+  $tahun = $_POST['tahun'] ?? date('Y'); // Ambil input tahun
+
+  // Panggil fungsi login dengan 3 parameter
+  if (Auth::login($email, $password, $tahun)) {
     header('Location: index.php');
     exit;
   } else {
@@ -119,6 +130,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           <?php endif; ?>
 
           <form method="post" class="vstack gap-3">
+
+            <div>
+              <label class="form-label">Tahun Anggaran</label>
+              <select name="tahun" class="form-select">
+                <?php foreach ($years as $y): ?>
+                  <option value="<?= $y ?>"><?= $y ?></option>
+                <?php endforeach; ?>
+                <?php if (!in_array(date('Y'), $years)): ?>
+                  <option value="<?= date('Y') ?>"><?= date('Y') ?></option>
+                <?php endif; ?>
+              </select>
+            </div>
 
             <div>
               <label class="form-label">Email</label>

@@ -1,15 +1,19 @@
 <?php
 Auth::requireRole(['ADMIN', 'PPTK']);
 $pdo = Database::getConnection();
+$tahun_aktif = Auth::user()['tahun'];
 
 $msg = '';
 $err = '';
 
 // List Sub Kegiatan
-$subs = $pdo->query('SELECT s.id, s.kode_sub, s.nama_sub, r.tahun, r.nomor_rka
+$subs = $pdo->prepare('SELECT s.id, s.kode_sub, s.nama_sub, r.tahun, r.nomor_rka
   FROM subkegiatan s
   JOIN rka r ON s.rka_id=r.id
-  ORDER BY r.tahun DESC, s.id DESC')->fetchAll();
+  WHERE r.tahun = ?
+  ORDER BY r.tahun DESC, s.id DESC');
+$subs->execute([$tahun_aktif]);
+$subs = $subs->fetchAll();
 
 $selected_sub = isset($_GET['sub_id']) ? (int)$_GET['sub_id'] : 0;
 $komponen_list = [];
@@ -17,7 +21,7 @@ $komponen_list = [];
 // Ambil komponen jika Sub dipilih
 if ($selected_sub) {
   $stmt = $pdo->prepare('SELECT k.id, k.kode_komponen, k.uraian, k.total
-    FROM komponen k WHERE k.subkegiatan_id=? ORDER BY k.id DESC');
+    FROM komponen k WHERE k.subkegiatan_id=? ORDER BY k.id ASC');
   $stmt->execute([$selected_sub]);
   $komponen_list = $stmt->fetchAll();
 }
@@ -164,165 +168,165 @@ if ($selected_kid) {
 }
 ?>
 
-<div class="container-fluid">
 
-  <!-- Alert -->
-  <?php if ($msg): ?><div class="alert alert-success"><?= $msg ?></div><?php endif; ?>
-  <?php if ($err): ?><div class="alert alert-danger"><?= $err ?></div><?php endif; ?>
+<!-- Alert -->
+<?php if ($msg): ?><div class="alert alert-success"><?= $msg ?></div><?php endif; ?>
+<?php if ($err): ?><div class="alert alert-danger"><?= $err ?></div><?php endif; ?>
 
-  <!-- PILIH SUB -->
+<!-- PILIH SUB -->
+<div class="card mb-3">
+  <div class="card-header"><strong>Pilih Sub Kegiatan</strong></div>
+  <div class="card-body">
+    <form method="get" class="row g-3">
+      <input type="hidden" name="page" value="penyerapan">
+
+      <div class="col-md-6">
+        <select name="sub_id" class="form-select" onchange="this.form.submit()">
+          <option value="">-- Pilih Sub Kegiatan --</option>
+          <?php foreach ($subs as $s): ?>
+            <option value="<?= $s['id'] ?>" <?= $selected_sub == $s['id'] ? 'selected' : '' ?>>
+              [<?= $s['tahun'] ?>] <?= $s['nomor_rka'] ?> — <?= $s['kode_sub'] ?> - <?= $s['nama_sub'] ?>
+            </option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+    </form>
+  </div>
+</div>
+
+<?php if ($selected_sub): ?>
+  <!-- PILIH KOMPONEN -->
   <div class="card mb-3">
-    <div class="card-header"><strong>Pilih Sub Kegiatan</strong></div>
+    <div class="card-header"><strong>Pilih Komponen</strong></div>
     <div class="card-body">
-      <form method="get" class="row g-3">
+      <form method="get" class="row g-3 align-items-end">
         <input type="hidden" name="page" value="penyerapan">
+        <input type="hidden" name="sub_id" value="<?= $selected_sub ?>">
 
-        <div class="col-md-6">
-          <select name="sub_id" class="form-select" onchange="this.form.submit()">
-            <option value="">-- Pilih Sub Kegiatan --</option>
-            <?php foreach ($subs as $s): ?>
-              <option value="<?= $s['id'] ?>" <?= $selected_sub == $s['id'] ? 'selected' : '' ?>>
-                [<?= $s['tahun'] ?>] <?= $s['nomor_rka'] ?> — <?= $s['kode_sub'] ?> - <?= $s['nama_sub'] ?>
+        <div class="col-md-8">
+          <select name="komponen_id" class="form-select">
+            <option value="">-- Pilih Komponen --</option>
+            <?php foreach ($komponen_list as $k): ?>
+              <option value="<?= $k['id'] ?>" <?= $selected_kid == $k['id'] ? 'selected' : '' ?>>
+                <?= $k['kode_komponen'] ?> — <?= $k['uraian'] ?> (Pagu: Rp <?= number_format($k['total'], 2, ',', '.') ?>)
               </option>
             <?php endforeach; ?>
           </select>
         </div>
+        <div class="col-md-4">
+          <button class="btn btn-primary w-100">Tampilkan</button>
+        </div>
       </form>
     </div>
   </div>
+<?php endif; ?>
 
-  <?php if ($selected_sub): ?>
-    <!-- PILIH KOMPONEN -->
-    <div class="card mb-3">
-      <div class="card-header"><strong>Pilih Komponen</strong></div>
-      <div class="card-body">
-        <form method="get" class="row g-3 align-items-end">
-          <input type="hidden" name="page" value="penyerapan">
-          <input type="hidden" name="sub_id" value="<?= $selected_sub ?>">
+<?php if ($selected_kid && $komp_summary): ?>
+  <!-- RINGKASAN KOMPONEN -->
+  <div class="card mb-3">
+    <div class="card-header"><strong>Ringkasan Komponen</strong></div>
+    <div class="card-body">
+      <p><strong>Kode:</strong> <?= $komp_summary['kode_sub'] ?> / <?= $komp_summary['kode_komponen'] ?></p>
+      <p><strong>Nama:</strong> <?= $komp_summary['uraian'] ?></p>
 
-          <div class="col-md-8">
-            <select name="komponen_id" class="form-select">
-              <option value="">-- Pilih Komponen --</option>
-              <?php foreach ($komponen_list as $k): ?>
-                <option value="<?= $k['id'] ?>" <?= $selected_kid == $k['id'] ? 'selected' : '' ?>>
-                  <?= $k['kode_komponen'] ?> — <?= $k['uraian'] ?> (Pagu: Rp <?= number_format($k['total'], 2, ',', '.') ?>)
-                </option>
-              <?php endforeach; ?>
-            </select>
-          </div>
-          <div class="col-md-4">
-            <button class="btn btn-primary w-100">Tampilkan</button>
-          </div>
-        </form>
-      </div>
+      <p><strong>Volume:</strong> <?= (float)$komp_summary['volume'] ?> <?= htmlspecialchars($komp_summary['satuan']) ?></p>
+      <p><strong>Harga Satuan:</strong> Rp <?= number_format($komp_summary['harga_satuan'], 2, ',', '.') ?></p>
+      <p><strong>Pagu Total:</strong> Rp <?= number_format($komp_summary['total'], 2, ',', '.') ?></p>
+      <p><strong>Total Rencana:</strong> Rp <?= number_format($komp_summary['total_rencana'], 2, ',', '.') ?></p>
+      <p><strong>Sisa Pagu:</strong> Rp <?= number_format($komp_summary['sisa'], 2, ',', '.') ?></p>
     </div>
-  <?php endif; ?>
+  </div>
 
-  <?php if ($selected_kid && $komp_summary): ?>
-    <!-- RINGKASAN KOMPONEN -->
-    <div class="card mb-3">
-      <div class="card-header"><strong>Ringkasan Komponen</strong></div>
-      <div class="card-body">
-        <p><strong>Kode:</strong> <?= $komp_summary['kode_sub'] ?> / <?= $komp_summary['kode_komponen'] ?></p>
-        <p><strong>Nama:</strong> <?= $komp_summary['uraian'] ?></p>
-        <p><strong>Pagu:</strong> Rp <?= number_format($komp_summary['total'], 2, ',', '.') ?></p>
-        <p><strong>Total Rencana:</strong> Rp <?= number_format($komp_summary['total_rencana'], 2, ',', '.') ?></p>
-        <p><strong>Sisa:</strong> Rp <?= number_format($komp_summary['sisa'], 2, ',', '.') ?></p>
-      </div>
-    </div>
+  <!-- FORM TAMBAH / EDIT -->
+  <div class="card mb-3">
+    <div class="card-header"><strong><?= $edit_item ? 'Edit Rencana Tahap' : 'Tambah Rencana Tahap' ?></strong></div>
+    <div class="card-body">
 
-    <!-- FORM TAMBAH / EDIT -->
-    <div class="card mb-3">
-      <div class="card-header"><strong><?= $edit_item ? 'Edit Rencana Tahap' : 'Tambah Rencana Tahap' ?></strong></div>
-      <div class="card-body">
+      <form method="post" class="row g-3">
+        <input type="hidden" name="subkegiatan_id" value="<?= $komp_summary['sub_id'] ?>">
+        <input type="hidden" name="komponen_id" value="<?= $komp_summary['id'] ?>">
 
-        <form method="post" class="row g-3">
-          <input type="hidden" name="subkegiatan_id" value="<?= $komp_summary['sub_id'] ?>">
-          <input type="hidden" name="komponen_id" value="<?= $komp_summary['id'] ?>">
+        <?php if ($edit_item): ?>
+          <input type="hidden" name="action" value="update">
+          <input type="hidden" name="id" value="<?= $edit_item['id'] ?>">
+        <?php else: ?>
+          <input type="hidden" name="action" value="create">
+        <?php endif; ?>
+
+        <div class="col-md-4">
+          <label class="form-label">Nilai Rencana (Rp)</label>
+          <input type="number" step="0.01" name="rencana" class="form-control" required
+            value="<?= $edit_item ? $edit_item['rencana'] : '' ?>">
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label">Bulan Target</label>
+          <select name="bulan_target" class="form-select">
+            <option value="">-- Tidak Ditentukan --</option>
+            <?php for ($b = 1; $b <= 12; $b++): ?>
+              <option value="<?= $b ?>" <?= $edit_item && $edit_item['bulan_target'] == $b ? 'selected' : '' ?>>Bulan <?= $b ?></option>
+            <?php endfor; ?>
+          </select>
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label">Keterangan</label>
+          <input type="text" name="keterangan" class="form-control"
+            value="<?= $edit_item ? htmlspecialchars($edit_item['keterangan']) : '' ?>">
+        </div>
+
+        <div class="col-12">
+          <button class="btn btn-primary"><?= $edit_item ? 'Simpan Perubahan' : 'Tambah Rencana' ?></button>
 
           <?php if ($edit_item): ?>
-            <input type="hidden" name="action" value="update">
-            <input type="hidden" name="id" value="<?= $edit_item['id'] ?>">
-          <?php else: ?>
-            <input type="hidden" name="action" value="create">
+            <a href="index.php?page=penyerapan&sub_id=<?= $komp_summary['sub_id'] ?>&komponen_id=<?= $komp_summary['id'] ?>" class="btn btn-secondary ms-2">Batal</a>
           <?php endif; ?>
-
-          <div class="col-md-4">
-            <label class="form-label">Nilai Rencana (Rp)</label>
-            <input type="number" step="0.01" name="rencana" class="form-control" required
-              value="<?= $edit_item ? $edit_item['rencana'] : '' ?>">
-          </div>
-
-          <div class="col-md-4">
-            <label class="form-label">Bulan Target</label>
-            <select name="bulan_target" class="form-select">
-              <option value="">-- Tidak Ditentukan --</option>
-              <?php for ($b = 1; $b <= 12; $b++): ?>
-                <option value="<?= $b ?>" <?= $edit_item && $edit_item['bulan_target'] == $b ? 'selected' : '' ?>>Bulan <?= $b ?></option>
-              <?php endfor; ?>
-            </select>
-          </div>
-
-          <div class="col-md-4">
-            <label class="form-label">Keterangan</label>
-            <input type="text" name="keterangan" class="form-control"
-              value="<?= $edit_item ? htmlspecialchars($edit_item['keterangan']) : '' ?>">
-          </div>
-
-          <div class="col-12">
-            <button class="btn btn-primary"><?= $edit_item ? 'Simpan Perubahan' : 'Tambah Rencana' ?></button>
-
-            <?php if ($edit_item): ?>
-              <a href="index.php?page=penyerapan&sub_id=<?= $komp_summary['sub_id'] ?>&komponen_id=<?= $komp_summary['id'] ?>" class="btn btn-secondary ms-2">Batal</a>
-            <?php endif; ?>
-          </div>
-        </form>
-
-      </div>
-    </div>
-
-    <!-- TABEL RENCANA -->
-    <div class="card">
-      <div class="card-header"><strong>Daftar Rencana Tahap</strong></div>
-      <div class="card-body">
-        <div class="table-responsive">
-          <table class="table table-striped table-hover align-middle">
-            <thead class="table-light">
-              <tr>
-                <th>Tahap</th>
-                <th>Nilai Rencana</th>
-                <th>Bulan Target</th>
-                <th>Keterangan</th>
-                <th>Dibuat</th>
-                <th>Aksi</th>
-              </tr>
-            </thead>
-            <tbody>
-              <?php foreach ($items as $it): ?>
-                <tr>
-                  <td><?= $it['tahap'] ?></td>
-                  <td>Rp <?= number_format($it['rencana'], 2, ',', '.') ?></td>
-                  <td><?= $it['bulan_target'] ? "Bulan " . $it['bulan_target'] : "-" ?></td>
-                  <td><?= htmlspecialchars($it['keterangan']) ?></td>
-                  <td><?= $it['created_at'] ?></td>
-                  <td class="d-flex flex-wrap gap-2">
-                    <a href="index.php?page=penyerapan&sub_id=<?= $komp_summary['sub_id'] ?>&komponen_id=<?= $komp_summary['id'] ?>&edit_id=<?= $it['id'] ?>" class="btn btn-sm btn-outline-primary">Edit</a>
-                    <a href="index.php?page=penyerapan&del=<?= $it['id'] ?>" class="btn btn-sm btn-outline-danger"
-                      onclick="return confirm('Hapus rencana tahap ini?')">Hapus</a>
-                  </td>
-                </tr>
-              <?php endforeach; ?>
-
-              <?php if (empty($items)): ?>
-                <tr>
-                  <td colspan="6" class="text-center text-muted">Belum ada rencana tahap.</td>
-                </tr>
-              <?php endif; ?>
-            </tbody>
-          </table>
         </div>
+      </form>
+
+    </div>
+  </div>
+
+  <!-- TABEL RENCANA -->
+  <div class="card">
+    <div class="card-header"><strong>Daftar Rencana Tahap</strong></div>
+    <div class="card-body">
+      <div class="table-responsive">
+        <table class="table table-striped table-hover align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>Tahap</th>
+              <th>Nilai Rencana</th>
+              <th>Bulan Target</th>
+              <th>Keterangan</th>
+              <th>Dibuat</th>
+              <th>Aksi</th>
+            </tr>
+          </thead>
+          <tbody>
+            <?php foreach ($items as $it): ?>
+              <tr>
+                <td><?= $it['tahap'] ?></td>
+                <td>Rp <?= number_format($it['rencana'], 2, ',', '.') ?></td>
+                <td><?= $it['bulan_target'] ? "Bulan " . $it['bulan_target'] : "-" ?></td>
+                <td><?= htmlspecialchars($it['keterangan']) ?></td>
+                <td><?= $it['created_at'] ?></td>
+                <td class="d-flex flex-wrap gap-2">
+                  <a href="index.php?page=penyerapan&sub_id=<?= $komp_summary['sub_id'] ?>&komponen_id=<?= $komp_summary['id'] ?>&edit_id=<?= $it['id'] ?>" class="btn btn-sm btn-outline-primary">Edit</a>
+                  <a href="index.php?page=penyerapan&del=<?= $it['id'] ?>" class="btn btn-sm btn-outline-danger"
+                    onclick="return confirm('Hapus rencana tahap ini?')">Hapus</a>
+                </td>
+              </tr>
+            <?php endforeach; ?>
+
+            <?php if (empty($items)): ?>
+              <tr>
+                <td colspan="6" class="text-center text-muted">Belum ada rencana tahap.</td>
+              </tr>
+            <?php endif; ?>
+          </tbody>
+        </table>
       </div>
     </div>
-  <?php endif; ?>
-
-</div>
+  </div>
+<?php endif; ?>

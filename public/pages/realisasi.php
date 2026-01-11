@@ -1,9 +1,16 @@
 <?php
 Auth::requireRole(['ADMIN', 'PPTK', 'BENDAHARA']);
 $pdo = Database::getConnection();
+$tahun_aktif = Auth::user()['tahun'];
 
 // Ambil komponen & SPJ untuk dropdown
-$komp = $pdo->query('SELECT id, kode_komponen, uraian FROM komponen ORDER BY id DESC')->fetchAll();
+$komp = $pdo->prepare('SELECT k.id, k.kode_komponen, k.uraian, r.tahun FROM komponen k
+INNER JOIN subkegiatan s ON k.subkegiatan_id = s.id
+INNER JOIN rka r ON s.rka_id = r.id
+  WHERE r.tahun = ?
+ORDER BY k.id DESC');
+$komp->execute([$tahun_aktif]);
+$komp = $komp->fetchAll();
 $spj  = $pdo->query('SELECT id, nomor_spj, jenis FROM spj ORDER BY id DESC')->fetchAll();
 
 $msg = '';

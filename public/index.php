@@ -118,7 +118,8 @@ $user = Auth::user();
 
       <div class="ms-auto d-flex align-items-center gap-3">
         <span class="text-secondary d-none d-sm-inline">
-          Halo, <strong><?= htmlspecialchars($user['name']) ?></strong> (<?= $user['role'] ?>)
+          Halo, <strong><?= htmlspecialchars($user['name']) ?></strong>
+          (<?= $user['role'] ?> - TA <?= $user['tahun'] ?>)
         </span>
         <a href="logout.php" class="btn btn-outline-danger btn-sm">
           <i class="bi bi-box-arrow-right me-1"></i> Logout
@@ -171,11 +172,7 @@ $user = Auth::user();
 
       <!-- Konten -->
       <div class="col-12 col-lg-10" id="contentColumn">
-        <div class="card">
-          <div class="card-body">
-            <?php include __DIR__ . '/pages/' . $page . '.php'; ?>
-          </div>
-        </div>
+        <?php include __DIR__ . '/pages/' . $page . '.php'; ?>
 
         <!-- Footer -->
         <div class="app-footer">
